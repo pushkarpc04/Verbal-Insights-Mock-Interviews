@@ -34,6 +34,7 @@ import {
   Info,
   BookOpen,
   LogOut,
+  LogIn, // Added LogIn import
   User,
   Clock,
   AlertTriangle,
@@ -84,6 +85,7 @@ export const Icons = {
   info: Info,
   guide: BookOpen,
   logout: LogOut,
+  login: LogIn, // Added login icon
   user: User,
   clock: Clock,
   warning: AlertTriangle,
@@ -135,3 +137,4 @@ export const LoadingSpinner = ({ className }: { className?: string }) => (
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
+
