@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,21 +19,64 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function PracticeNewInterviewPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [answers, setAnswers] = useState<Answer[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
+  const [isRecording, setIsRecording] = useState(false); // This now primarily controls timer/UI state
   const [recordingTime, setRecordingTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [interviewTitle, setInterviewTitle] = useState("Practice Session");
   
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const getCameraPermission = async () => {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setHasCameraPermission(true);
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings to display video.',
+          });
+        }
+      } else {
+        setHasCameraPermission(false);
+        toast({
+            variant: 'destructive',
+            title: 'Camera Not Supported',
+            description: 'Your browser does not support camera access or you are in an insecure context.',
+          });
+      }
+    };
+    getCameraPermission();
+
+    return () => {
+      // Cleanup: stop camera stream when component unmounts
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [toast]);
 
   useEffect(()_ => {
     const storedQuestions = localStorage.getItem('currentInterviewQuestions');
@@ -44,10 +88,6 @@ export default function PracticeNewInterviewPage() {
       setInterviewTitle(storedTitle);
     }
     setIsLoading(false);
-    // Clean up local storage for next session (optional)
-    // localStorage.removeItem('currentInterviewQuestions');
-    // localStorage.removeItem('currentInterviewJobDescription');
-    // localStorage.removeItem('currentInterviewTitle');
   }, []);
 
   useEffect(() => {
@@ -66,13 +106,11 @@ export default function PracticeNewInterviewPage() {
   const handleStartRecording = () => {
     setIsRecording(true);
     setRecordingTime(0);
-    // Add actual audio recording logic here if needed
-    // For now, it just starts a timer and allows text input
+    // Actual audio recording logic could be added here
   };
 
   const handleStopRecording = () => {
     setIsRecording(false);
-    // Process recording/transcript here
   };
 
   const handleNextQuestion = () => {
@@ -91,15 +129,13 @@ export default function PracticeNewInterviewPage() {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
-      // Last question answered, show finish dialog or redirect
       handleFinishInterview([...answers, newAnswer]);
     }
   };
   
   const handleFinishInterview = (finalAnswers?: Answer[]) => {
-    const allAnswers = finalAnswers || answers;
-    if (allAnswers.length !== questions.length && !finalAnswers?.find(a => a.questionId === questions[currentQuestionIndex].id)) {
-       // If finishing before answering the last question, save the current one.
+    let allAnswers = finalAnswers || [...answers]; // Create a mutable copy
+    if (currentAnswer && questions[currentQuestionIndex] && !allAnswers.find(a => a.questionId === questions[currentQuestionIndex].id)) {
       const lastAnswer: Answer = {
         questionId: questions[currentQuestionIndex].id,
         transcript: currentAnswer,
@@ -108,14 +144,14 @@ export default function PracticeNewInterviewPage() {
        allAnswers.push(lastAnswer);
     }
 
-
     setIsSubmitting(true);
-    // Simulate submission and analysis
     localStorage.setItem('interviewResults_questions', JSON.stringify(questions));
     localStorage.setItem('interviewResults_answers', JSON.stringify(allAnswers));
     localStorage.setItem('interviewResults_title', interviewTitle);
     const jobDesc = localStorage.getItem('currentInterviewJobDescription');
     if(jobDesc) localStorage.setItem('interviewResults_jobDescription', jobDesc);
+    const resumeUri = localStorage.getItem('currentInterviewResumeDataUri');
+    if(resumeUri) localStorage.setItem('interviewResults_resumeDataUri', resumeUri);
 
 
     toast({ title: "Processing Interview...", description: "Analyzing your answers. This may take a moment." });
@@ -123,7 +159,7 @@ export default function PracticeNewInterviewPage() {
     setTimeout(() => {
       setIsSubmitting(false);
       router.push(`/interviews/results-new`);
-    }, 2000); // Simulate delay for AI processing
+    }, 2000); 
   };
 
   if (isLoading) {
@@ -154,12 +190,25 @@ export default function PracticeNewInterviewPage() {
         </CardHeader>
 
         <CardContent className="p-6 space-y-6">
+          <div className="mb-4">
+            <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted border" autoPlay muted playsInline />
+            {hasCameraPermission === false && (
+              <Alert variant="destructive" className="mt-2">
+                <Icons.warning className="h-4 w-4" />
+                <AlertTitle>Camera Access Required</AlertTitle>
+                <AlertDescription>
+                  Please allow camera access in your browser settings to display video. Refresh the page after granting permission.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
           <div>
             <h2 className="text-xl font-semibold mb-3 font-headline text-primary">
               {currentQ.text}
             </h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Take your time to think, then record your answer.
+              Think about your answer, then use the controls below to simulate responding.
             </p>
           </div>
 
@@ -168,25 +217,25 @@ export default function PracticeNewInterviewPage() {
               <Button 
                 onClick={isRecording ? handleStopRecording : handleStartRecording}
                 variant={isRecording ? "destructive" : "default"}
-                className="min-w-[150px]"
-                aria-label={isRecording ? "Stop recording" : "Start recording"}
+                className="min-w-[160px]"
+                aria-label={isRecording ? "Stop timer" : "Start timer"}
               >
-                {isRecording ? <Icons.pause className="mr-2 h-5 w-5" /> : <Icons.mic className="mr-2 h-5 w-5" />}
-                {isRecording ? "Stop Recording" : "Start Recording"}
+                {isRecording ? <Icons.pause className="mr-2 h-5 w-5" /> : <Icons.play className="mr-2 h-5 w-5" />}
+                {isRecording ? "Stop Answering" : "Start Answering"}
               </Button>
               {isRecording && (
-                <div className="flex items-center gap-2 text-destructive">
-                  <div className="h-3 w-3 bg-destructive rounded-full animate-pulse"></div>
+                <div className="flex items-center gap-2 text-destructive animate-pulse">
+                  <Icons.mic className="h-5 w-5" />
                   <span>{new Date(recordingTime * 1000).toISOString().substr(14, 5)}</span>
                 </div>
               )}
             </div>
             <Textarea
-              placeholder="Your answer will appear here (or type directly if not recording audio)..."
+              placeholder="You can type your answer or key points here..."
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
-              className="min-h-[200px] resize-y text-base border-2 focus:border-primary transition-colors duration-300"
-              aria-label="Your answer transcript"
+              className="min-h-[150px] resize-y text-base border-2 focus:border-primary transition-colors duration-300"
+              aria-label="Your answer notes"
               disabled={isSubmitting}
             />
           </div>
@@ -203,7 +252,7 @@ export default function PracticeNewInterviewPage() {
               <DialogHeader>
                 <DialogTitle>Are you sure you want to end the interview?</DialogTitle>
                 <DialogDescription>
-                  Any unsaved answers for the current question will be lost. Your completed answers will be submitted for analysis.
+                  Your completed answers will be submitted for analysis. If you are currently answering a question, that answer will also be saved.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -218,11 +267,11 @@ export default function PracticeNewInterviewPage() {
 
           <Button 
             onClick={handleNextQuestion} 
-            disabled={!currentAnswer && !isRecording || isSubmitting}
+            disabled={(!currentAnswer && !isRecording && questions.length > 0) || isSubmitting}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
             aria-label={currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish and Submit"}
           >
-            {isSubmitting && <LoadingSpinner className="mr-2 h-4 w-4" />}
+            {isSubmitting && currentQuestionIndex === questions.length -1 && <LoadingSpinner className="mr-2 h-4 w-4" />}
             {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish & Submit"}
             {currentQuestionIndex < questions.length - 1 && <Icons.next className="ml-2 h-5 w-5" />}
           </Button>

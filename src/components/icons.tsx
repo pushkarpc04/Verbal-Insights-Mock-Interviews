@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   Home,
@@ -43,7 +44,9 @@ import {
   Target,
   Edit,
   Book,
-  Search
+  Search,
+  Mail,
+  Lock,
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -92,6 +95,8 @@ export const Icons = {
   editPencil: Edit,
   book: Book,
   search: Search,
+  mail: Mail,
+  lock: Lock,
   logo: (props: React.SVGProps<SVGSVGElement>) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"

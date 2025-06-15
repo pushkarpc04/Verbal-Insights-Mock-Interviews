@@ -1,3 +1,4 @@
+
 'use server';
 
 import { generateInterviewQuestions as genQuestionsFlow, GenerateInterviewQuestionsInput, GenerateInterviewQuestionsOutput } from '@/ai/flows/generate-interview-questions';
@@ -10,6 +11,8 @@ import { z } from 'zod';
 const GenerateQuestionsSchema = z.object({
   jobDescription: z.string().min(50, "Job description must be at least 50 characters."),
   numQuestions: z.number().min(1).max(10).optional().default(5),
+  resumeDataUri: z.string().optional(), // Added for resume content
+  interviewTitle: z.string().min(1), // Added for the title, validation handled in component
 });
 
 export async function generateInterviewQuestionsAction(
@@ -17,19 +20,24 @@ export async function generateInterviewQuestionsAction(
 ): Promise<{ success: boolean; data?: GenerateInterviewQuestionsOutput; error?: string }> {
   const validatedFields = GenerateQuestionsSchema.safeParse(values);
   if (!validatedFields.success) {
-    return { success: false, error: "Invalid input: " + validatedFields.error.flatten().fieldErrors.jobDescription?.join(", ") };
+    // Construct a more generic error message or handle specific field errors
+    const errors = validatedFields.error.flatten().fieldErrors;
+    const errorMessages = Object.values(errors).flat().join(", ");
+    return { success: false, error: "Invalid input: " + (errorMessages || "Please check your entries.") };
   }
 
   try {
     const input: GenerateInterviewQuestionsInput = {
       jobDescription: validatedFields.data.jobDescription,
       numQuestions: validatedFields.data.numQuestions,
+      resumeDataUri: validatedFields.data.resumeDataUri,
     };
     const result = await genQuestionsFlow(input);
     return { success: true, data: result };
   } catch (e) {
     console.error("Error in generateInterviewQuestionsAction:", e);
-    return { success: false, error: "Failed to generate questions. Please try again." };
+    const errorMessage = e instanceof Error ? e.message : "Failed to generate questions. Please try again.";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -52,7 +60,8 @@ export async function analyzeCandidatePerformanceAction(
     return { success: true, data: result };
   } catch (e) {
     console.error("Error in analyzeCandidatePerformanceAction:", e);
-    return { success: false, error: "Failed to analyze performance." };
+    const errorMessage = e instanceof Error ? e.message : "Failed to analyze performance.";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -75,7 +84,8 @@ export async function provideAIPoweredCoachingAction(
     return { success: true, data: result };
   } catch (e) {
     console.error("Error in provideAIPoweredCoachingAction:", e);
-    return { success: false, error: "Failed to provide coaching." };
+    const errorMessage = e instanceof Error ? e.message : "Failed to provide coaching.";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -97,7 +107,8 @@ export async function analyzeKeywordRelevanceAction(
     return { success: true, data: result };
   } catch (e) {
     console.error("Error in analyzeKeywordRelevanceAction:", e);
-    return { success: false, error: "Failed to analyze keyword relevance." };
+    const errorMessage = e instanceof Error ? e.message : "Failed to analyze keyword relevance.";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -105,11 +116,11 @@ export async function analyzeKeywordRelevanceAction(
 export async function summarizeAnswerAction(
   answerText: string
 ): Promise<{ success: boolean; data?: { summary: string }; error?: string }> {
-  if (!answerText || answerText.length < 50) {
+  if (!answerText || answerText.length < 10) { // Reduced min length for mock
     return { success: false, error: "Answer text is too short to summarize." };
   }
   // Mock summarization
   await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-  const summary = "This is a mock summary of the first 10 words: " + answerText.split(" ").slice(0, 10).join(" ") + "...";
+  const summary = "This is a mock summary of the answer provided, focusing on the key points mentioned by the candidate such as: " + answerText.split(" ").slice(0, 15).join(" ") + "...";
   return { success: true, data: { summary } };
 }

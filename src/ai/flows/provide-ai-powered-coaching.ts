@@ -1,4 +1,5 @@
-// 'use server';
+
+'use server';
 
 /**
  * @fileOverview Provides AI-powered coaching and personalized advice on how to improve interview responses.

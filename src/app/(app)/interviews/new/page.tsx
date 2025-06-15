@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useTransition } from "react";
@@ -26,29 +27,68 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 
 const formSchema = z.object({
+  interviewTitle: z.string().min(5, "Title must be at least 5 characters.").max(100, "Title cannot exceed 100 characters."),
   jobDescription: z.string().min(100, {
     message: "Job description must be at least 100 characters.",
   }).max(5000, {
     message: "Job description must not exceed 5000 characters.",
   }),
   numQuestions: z.coerce.number().min(1).max(10).default(5),
-  interviewTitle: z.string().min(5, "Title must be at least 5 characters.").max(100, "Title too long."),
+  resumeDataUri: z.string().optional(),
 });
 
 export default function NewInterviewPage() {
   const [isPending, startTransition] = useTransition();
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([]);
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      interviewTitle: "",
       jobDescription: "",
       numQuestions: 5,
-      interviewTitle: "",
+      resumeDataUri: undefined,
     },
   });
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+          toast({ title: "File too large", description: "Please upload a resume under 5MB.", variant: "destructive" });
+          event.target.value = ""; // Reset file input
+          setResumeFileName(null);
+          form.setValue("resumeDataUri", undefined);
+          return;
+      }
+      const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
+      if (!allowedTypes.includes(file.type)) {
+          toast({ title: "Invalid file type", description: "Please upload a PDF, DOCX, or TXT file.", variant: "destructive" });
+          event.target.value = ""; // Reset file input
+          setResumeFileName(null);
+          form.setValue("resumeDataUri", undefined);
+          return;
+      }
+
+      setResumeFileName(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        form.setValue("resumeDataUri", reader.result as string);
+      };
+      reader.onerror = () => {
+          toast({ title: "Error reading file", description: "Could not read the resume file.", variant: "destructive" });
+          setResumeFileName(null);
+          form.setValue("resumeDataUri", undefined);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      form.setValue("resumeDataUri", undefined);
+      setResumeFileName(null);
+    }
+  };
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
@@ -56,6 +96,8 @@ export default function NewInterviewPage() {
       const result = await generateInterviewQuestionsAction({
         jobDescription: values.jobDescription,
         numQuestions: values.numQuestions,
+        resumeDataUri: values.resumeDataUri,
+        interviewTitle: values.interviewTitle, // Pass title for consistency although not directly used in this action
       });
       if (result.success && result.data?.questions) {
         setGeneratedQuestions(
@@ -68,8 +110,8 @@ export default function NewInterviewPage() {
         });
       } else {
         toast({
-          title: "Error",
-          description: result.error || "Failed to generate questions.",
+          title: "Error Generating Questions",
+          description: result.error || "Failed to generate questions. Please ensure your input is valid and try again.",
           variant: "destructive",
         });
       }
@@ -77,30 +119,30 @@ export default function NewInterviewPage() {
   }
 
   const handleStartPractice = () => {
-    // In a real app, you'd save this session and redirect to its practice page
-    // For now, we'll pass data via query params or local storage if it's too large
-    // Or ideally, use a state management solution or POST to create a session
     localStorage.setItem('currentInterviewQuestions', JSON.stringify(generatedQuestions));
     localStorage.setItem('currentInterviewJobDescription', form.getValues('jobDescription'));
     localStorage.setItem('currentInterviewTitle', form.getValues('interviewTitle'));
-    router.push(`/interviews/practice-new`); // A dynamic route would be better for saved sessions
+    if (form.getValues('resumeDataUri')) {
+      localStorage.setItem('currentInterviewResumeDataUri', form.getValues('resumeDataUri')!);
+    } else {
+      localStorage.removeItem('currentInterviewResumeDataUri');
+    }
+    router.push(`/interviews/practice-new`);
   };
   
   const handleSaveQuestionSet = () => {
-    // Mock saving question set
     toast({
       title: "Question Set Saved (Mock)",
       description: `The set "${form.getValues('interviewTitle')}" with ${generatedQuestions.length} questions has been saved.`,
     });
   };
 
-
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold tracking-tight font-headline">Create New Mock Interview</h1>
         <p className="text-muted-foreground">
-          Generate tailored interview questions by providing a job description.
+          Generate tailored interview questions by providing a job description and optionally your resume.
         </p>
       </header>
 
@@ -108,8 +150,8 @@ export default function NewInterviewPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardHeader>
-              <CardTitle>Job & Interview Details</CardTitle>
-              <CardDescription>Enter the job description and a title for this interview session.</CardDescription>
+              <CardTitle>Job, Resume & Interview Details</CardTitle>
+              <CardDescription>Enter the job description, optionally upload your resume, and set a title for this interview session.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <FormField
@@ -146,6 +188,25 @@ export default function NewInterviewPage() {
                   </FormItem>
                 )}
               />
+               <FormItem>
+                <FormLabel>Upload Resume (Optional)</FormLabel>
+                <FormControl>
+                  <Input type="file" accept=".pdf,.docx,.txt" onChange={handleFileChange} className="file:text-primary file:font-medium" />
+                </FormControl>
+                {resumeFileName && <FormDescription>Uploaded: {resumeFileName}</FormDescription>}
+                <FormDescription>PDF, DOCX, or TXT. Max 5MB. Questions will be tailored based on your resume.</FormDescription>
+                {/* Hidden field for react-hook-form to track the data URI is implicitly handled by form.setValue("resumeDataUri", ...) */}
+                <FormField
+                    control={form.control}
+                    name="resumeDataUri"
+                    render={({ field }) => (
+                    <FormControl>
+                        <input type="hidden" {...field} />
+                    </FormControl>
+                    )}
+                />
+                {/* <FormMessage /> This would be for errors on the resumeDataUri field itself if it had direct validation */}
+              </FormItem>
               <FormField
                 control={form.control}
                 name="numQuestions"
