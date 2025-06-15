@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -71,7 +72,7 @@ export function MainNav() {
     <SidebarMenu>
       {navItems.map((item) => {
         const Icon = Icons[item.icon || "add"];
-        const isActive = item.items 
+        const isActive = item.items
           ? item.items.some(subItem => pathname.startsWith(subItem.href)) || pathname === item.href
           : pathname.startsWith(item.href);
 
@@ -81,13 +82,13 @@ export function MainNav() {
               asChild={!item.items}
               isActive={isActive}
               className="w-full"
-              tooltip={item.tooltip as string | undefined} 
+              tooltip={item.tooltip as string | undefined}
             >
               {item.items ? (
-                <button className="flex items-center w-full text-left">
+                <>
                   <Icon className="mr-2 h-5 w-5" />
                   <span>{item.title}</span>
-                </button>
+                </>
               ) : (
                 <Link href={item.href} className="flex items-center">
                   <Icon className="mr-2 h-5 w-5" />
