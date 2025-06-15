@@ -34,30 +34,7 @@ The **Verbal Insights - Mock Interviews Platform** enables users to simulate rea
 
 ---
 
-## Project Structure
 
-/Verbal-Insights-Mock-Interviews
-/.idx
-/.vscode
-/docs
-/src
-.gitignore
-.modified
-README.md
-apphosting.yaml
-components.json
-next.config.ts
-package-lock.json
-package.json
-postcss.config.mjs
-tailwind.config.ts
-tsconfig.json
-
-yaml
-Copy
-Edit
-
----
 
 ## Installation & Setup
 
