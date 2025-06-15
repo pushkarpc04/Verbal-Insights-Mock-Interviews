@@ -78,7 +78,7 @@ export default function PracticeNewInterviewPage() {
     };
   }, [toast]);
 
-  useEffect(()_ => {
+  useEffect(() => {
     const storedQuestions = localStorage.getItem('currentInterviewQuestions');
     const storedTitle = localStorage.getItem('currentInterviewTitle');
     if (storedQuestions) {
