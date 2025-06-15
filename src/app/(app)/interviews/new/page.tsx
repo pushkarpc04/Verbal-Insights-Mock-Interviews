@@ -50,7 +50,7 @@ export default function NewInterviewPage() {
       interviewTitle: "",
       jobDescription: "",
       numQuestions: 5,
-      resumeDataUri: undefined,
+      resumeDataUri: "", // Initialize with an empty string
     },
   });
 
@@ -61,7 +61,7 @@ export default function NewInterviewPage() {
           toast({ title: "File too large", description: "Please upload a resume under 5MB.", variant: "destructive" });
           event.target.value = ""; // Reset file input
           setResumeFileName(null);
-          form.setValue("resumeDataUri", undefined);
+          form.setValue("resumeDataUri", ""); // Set to empty string
           return;
       }
       const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
@@ -69,7 +69,7 @@ export default function NewInterviewPage() {
           toast({ title: "Invalid file type", description: "Please upload a PDF, DOCX, or TXT file.", variant: "destructive" });
           event.target.value = ""; // Reset file input
           setResumeFileName(null);
-          form.setValue("resumeDataUri", undefined);
+          form.setValue("resumeDataUri", ""); // Set to empty string
           return;
       }
 
@@ -81,11 +81,11 @@ export default function NewInterviewPage() {
       reader.onerror = () => {
           toast({ title: "Error reading file", description: "Could not read the resume file.", variant: "destructive" });
           setResumeFileName(null);
-          form.setValue("resumeDataUri", undefined);
+          form.setValue("resumeDataUri", ""); // Set to empty string
       };
       reader.readAsDataURL(file);
     } else {
-      form.setValue("resumeDataUri", undefined);
+      form.setValue("resumeDataUri", ""); // Set to empty string
       setResumeFileName(null);
     }
   };
@@ -96,8 +96,9 @@ export default function NewInterviewPage() {
       const result = await generateInterviewQuestionsAction({
         jobDescription: values.jobDescription,
         numQuestions: values.numQuestions,
-        resumeDataUri: values.resumeDataUri,
-        interviewTitle: values.interviewTitle, // Pass title for consistency although not directly used in this action
+        // Pass empty string as undefined if it's truly optional for the backend, or let backend handle empty string
+        resumeDataUri: values.resumeDataUri || undefined, 
+        interviewTitle: values.interviewTitle,
       });
       if (result.success && result.data?.questions) {
         setGeneratedQuestions(
@@ -122,8 +123,9 @@ export default function NewInterviewPage() {
     localStorage.setItem('currentInterviewQuestions', JSON.stringify(generatedQuestions));
     localStorage.setItem('currentInterviewJobDescription', form.getValues('jobDescription'));
     localStorage.setItem('currentInterviewTitle', form.getValues('interviewTitle'));
-    if (form.getValues('resumeDataUri')) {
-      localStorage.setItem('currentInterviewResumeDataUri', form.getValues('resumeDataUri')!);
+    const resumeUri = form.getValues('resumeDataUri');
+    if (resumeUri) {
+      localStorage.setItem('currentInterviewResumeDataUri', resumeUri);
     } else {
       localStorage.removeItem('currentInterviewResumeDataUri');
     }
@@ -195,17 +197,15 @@ export default function NewInterviewPage() {
                 </FormControl>
                 {resumeFileName && <FormDescription>Uploaded: {resumeFileName}</FormDescription>}
                 <FormDescription>PDF, DOCX, or TXT. Max 5MB. Questions will be tailored based on your resume.</FormDescription>
-                {/* Hidden field for react-hook-form to track the data URI is implicitly handled by form.setValue("resumeDataUri", ...) */}
                 <FormField
                     control={form.control}
                     name="resumeDataUri"
-                    render={({ field }) => (
+                    render={({ field }) => ( // field.value will be "" or a data URI string
                     <FormControl>
                         <input type="hidden" {...field} />
                     </FormControl>
                     )}
                 />
-                {/* <FormMessage /> This would be for errors on the resumeDataUri field itself if it had direct validation */}
               </FormItem>
               <FormField
                 control={form.control}
